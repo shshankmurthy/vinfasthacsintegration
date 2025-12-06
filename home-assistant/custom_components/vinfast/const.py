@@ -2,11 +2,45 @@
 
 DOMAIN = "vinfast"
 
-# API Configuration
-AUTH0_DOMAIN = "vinfast-us-prod.us.auth0.com"
-AUTH0_CLIENT_ID = "xhGY7XKDFSk1Q22rxidvwujfz0EPAbUP"
-AUTH0_AUDIENCE = "https://vinfast-us-prod.us.auth0.com/api/v2/"
-API_BASE = "https://mobile.connected-car.vinfastauto.us"
+# Region configuration
+CONF_REGION = "region"
+
+REGION_US = "us"
+REGION_EU = "eu"
+REGION_VN = "vn"
+
+REGIONS = {
+    REGION_US: {
+        "name": "United States",
+        "auth0_domain": "vinfast-us-prod.us.auth0.com",
+        "auth0_client_id": "xhGY7XKDFSk1Q22rxidvwujfz0EPAbUP",
+        "auth0_audience": "https://vinfast-us-prod.us.auth0.com/api/v2/",
+        "api_base": "https://mobile.connected-car.vinfastauto.us",
+    },
+    REGION_EU: {
+        "name": "Europe",
+        "auth0_domain": "vinfast-eu-prod.eu.auth0.com",
+        "auth0_client_id": "dxxtNkkhsPWW78x6s1BWQlmuCfLQrkze",
+        "auth0_audience": "https://vinfast-eu-prod.eu.auth0.com/api/v2/",
+        "api_base": "https://mobile.connected-car.vinfastauto.eu",
+    },
+    REGION_VN: {
+        "name": "Vietnam",
+        "auth0_domain": "vinfast-prod.us.auth0.com",
+        "auth0_client_id": "xhGY7XKDFSk1Q22rxidvwujfz0EPAbUP",
+        "auth0_audience": "https://vinfast-prod.us.auth0.com/api/v2/",
+        "api_base": "https://mobile.connected-car.vinfastauto.com",
+    },
+}
+
+# Default region
+DEFAULT_REGION = REGION_US
+
+# Legacy API Configuration (for backward compatibility)
+AUTH0_DOMAIN = REGIONS[REGION_US]["auth0_domain"]
+AUTH0_CLIENT_ID = REGIONS[REGION_US]["auth0_client_id"]
+AUTH0_AUDIENCE = REGIONS[REGION_US]["auth0_audience"]
+API_BASE = REGIONS[REGION_US]["api_base"]
 
 # Config keys
 CONF_EMAIL = "email"

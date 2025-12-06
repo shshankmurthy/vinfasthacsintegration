@@ -19,15 +19,22 @@ from .const import (
     DOMAIN,
     CONF_OCPP_ENTITY,
     CONF_OCPP_CHARGING_STATE,
+    CONF_REGION,
     DEFAULT_OCPP_CHARGER_ENTITY,
     DEFAULT_OCPP_CHARGING_STATE,
+    DEFAULT_REGION,
+    REGIONS,
 )
 from .pairing import VinFastPairing, VinFastPairingError
 
 _LOGGER = logging.getLogger(__name__)
 
+# Build region selector options
+REGION_OPTIONS = {key: config["name"] for key, config in REGIONS.items()}
+
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
+        vol.Required(CONF_REGION, default=DEFAULT_REGION): vol.In(REGION_OPTIONS),
         vol.Required(CONF_EMAIL): str,
         vol.Required(CONF_PASSWORD): str,
     }
@@ -53,7 +60,8 @@ class VinFastConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             try:
                 # Test credentials
                 session = async_get_clientsession(self.hass)
-                api = VinFastApi(session)
+                region = user_input.get(CONF_REGION, DEFAULT_REGION)
+                api = VinFastApi(session, region=region)
 
                 await api.authenticate(
                     user_input[CONF_EMAIL],

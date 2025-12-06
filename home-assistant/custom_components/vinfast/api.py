@@ -12,6 +12,8 @@ from .const import (
     AUTH0_CLIENT_ID,
     AUTH0_AUDIENCE,
     API_BASE,
+    DEFAULT_REGION,
+    REGIONS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -103,15 +105,37 @@ class VinFastAuthError(VinFastApiError):
 class VinFastApi:
     """VinFast Connected Car API Client."""
 
-    def __init__(self, session: aiohttp.ClientSession) -> None:
+    def __init__(self, session: aiohttp.ClientSession, region: str = DEFAULT_REGION) -> None:
         """Initialize the API client."""
         self._session = session
+        self._region = region
+        self._region_config = REGIONS.get(region, REGIONS[DEFAULT_REGION])
         self._access_token: str | None = None
         self._refresh_token: str | None = None
         self._user_id: str | None = None
         self._vin: str | None = None
         self._alias_mappings: dict[str, dict[str, str]] = {}  # alias -> {path, objectId, etc}
         self._alias_version: str | None = None
+
+    @property
+    def auth0_domain(self) -> str:
+        """Return Auth0 domain for current region."""
+        return self._region_config["auth0_domain"]
+
+    @property
+    def auth0_client_id(self) -> str:
+        """Return Auth0 client ID for current region."""
+        return self._region_config["auth0_client_id"]
+
+    @property
+    def auth0_audience(self) -> str:
+        """Return Auth0 audience for current region."""
+        return self._region_config["auth0_audience"]
+
+    @property
+    def api_base(self) -> str:
+        """Return API base URL for current region."""
+        return self._region_config["api_base"]
 
     @property
     def vin(self) -> str | None:
@@ -125,11 +149,11 @@ class VinFastApi:
 
     async def authenticate(self, email: str, password: str) -> bool:
         """Authenticate with VinFast Connected Car services."""
-        url = f"https://{AUTH0_DOMAIN}/oauth/token"
+        url = f"https://{self.auth0_domain}/oauth/token"
 
         payload = {
-            "client_id": AUTH0_CLIENT_ID,
-            "audience": AUTH0_AUDIENCE,
+            "client_id": self.auth0_client_id,
+            "audience": self.auth0_audience,
             "grant_type": "password",
             "scope": "offline_access openid profile email",
             "username": email,
@@ -167,10 +191,10 @@ class VinFastApi:
         if not self._refresh_token:
             return False
 
-        url = f"https://{AUTH0_DOMAIN}/oauth/token"
+        url = f"https://{self.auth0_domain}/oauth/token"
 
         payload = {
-            "client_id": AUTH0_CLIENT_ID,
+            "client_id": self.auth0_client_id,
             "grant_type": "refresh_token",
             "refresh_token": self._refresh_token,
         }
@@ -213,7 +237,7 @@ class VinFastApi:
         self, method: str, endpoint: str, data: dict | None = None
     ) -> dict[str, Any]:
         """Make an API request."""
-        url = f"{API_BASE}{endpoint}"
+        url = f"{self.api_base}{endpoint}"
 
         try:
             async with async_timeout.timeout(30):
@@ -270,7 +294,7 @@ class VinFastApi:
 
         try:
             # This endpoint may have different response format, so we call it directly
-            url = f"{API_BASE}/modelmgmt/api/v2/vehicle-model/mobile-app/vehicle/get-alias?version={version}"
+            url = f"{self.api_base}/modelmgmt/api/v2/vehicle-model/mobile-app/vehicle/get-alias?version={version}"
 
             async with async_timeout.timeout(30):
                 async with self._session.get(url, headers=self._get_headers()) as response:

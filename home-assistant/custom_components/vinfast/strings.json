@@ -3,8 +3,9 @@
     "step": {
       "user": {
         "title": "VinFast Connected Car",
-        "description": "Enter your VinFast account credentials.",
+        "description": "Select your region and enter your VinFast account credentials.",
         "data": {
+          "region": "Region",
           "email": "Email",
           "password": "Password"
         }

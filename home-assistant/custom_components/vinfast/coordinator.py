@@ -19,8 +19,10 @@ from .const import (
     UPDATE_INTERVAL_CHARGING,
     CONF_OCPP_ENTITY,
     CONF_OCPP_CHARGING_STATE,
+    CONF_REGION,
     DEFAULT_OCPP_CHARGER_ENTITY,
     DEFAULT_OCPP_CHARGING_STATE,
+    DEFAULT_REGION,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -48,7 +50,8 @@ class VinFastDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Fetch data from VinFast API."""
         if self._api is None:
             session = async_get_clientsession(self.hass)
-            self._api = VinFastApi(session)
+            region = self.config_entry.data.get(CONF_REGION, DEFAULT_REGION)
+            self._api = VinFastApi(session, region=region)
 
             # Authenticate
             try:
