@@ -196,7 +196,8 @@ views:
               const isIgnitionOn = states['binary_sensor.vinfast_power']?.state === 'on';
               const gear = states['sensor.vinfast_gear']?.state || 'P';
               const odometer = Math.round(parseFloat(states['sensor.vinfast_odometer']?.state)) || 0;
-              const battery12v = Math.round(parseFloat(states['sensor.vinfast_battery_12v']?.state)) || 0;
+              // 12V battery - entity may be named _voltage or _battery_12v depending on HA version
+              const battery12v = Math.round(parseFloat(states['sensor.vinfast_battery_12v']?.state || states['sensor.vinfast_voltage']?.state)) || 0;
 
               // Door/window status
               const doorsOpen = states['binary_sensor.vinfast_door']?.state === 'on';
