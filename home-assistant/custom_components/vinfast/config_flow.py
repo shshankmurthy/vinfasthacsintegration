@@ -31,7 +31,15 @@ from .const import (
     UPDATE_INTERVAL_OPTIONS,
     CHARGING_UPDATE_INTERVAL_OPTIONS,
 )
-from .pairing import VinFastPairing, VinFastPairingError
+
+# Optional pairing support - requires cryptography library
+try:
+    from .pairing import VinFastPairing, VinFastPairingError
+    PAIRING_AVAILABLE = True
+except ImportError:
+    PAIRING_AVAILABLE = False
+    VinFastPairing = None  # type: ignore
+    VinFastPairingError = Exception  # type: ignore
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -135,9 +143,14 @@ class VinFastOptionsFlow(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Manage the options."""
+        # Build menu options - only show pairing if cryptography is available
+        menu_options = ["configure_polling"]
+        if PAIRING_AVAILABLE:
+            menu_options.extend(["pair_remote", "unpair"])
+
         return self.async_show_menu(
             step_id="init",
-            menu_options=["configure_polling", "pair_remote", "unpair"],
+            menu_options=menu_options,
             description_placeholders={
                 "is_paired": "Yes" if self.config_entry.options.get(CONF_PAIRING_KEYS) else "No"
             },
