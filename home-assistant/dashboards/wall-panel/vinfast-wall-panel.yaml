@@ -2,14 +2,20 @@
 # A glassmorphism-style dashboard for VinFast EV owners
 # Repository: https://github.com/vinfastownersorg-cyber/vinfastowners
 #
-# INSTRUCTIONS: Search for "# CHANGE:" comments and update entity IDs to match your setup
+# SETUP: Run 'python3 setup.py' for interactive configuration, or
+#        search for entity IDs and update to match your Home Assistant setup.
+#
+# NEW IN V7:
+# - Last update time and next poll display
+# - Refresh button for manual telemetry update
+# - Hold/double-tap car card to view cameras
 #
 title: Wall Panel
 views:
   - title: Home
     path: home
     type: custom:grid-layout
-    background: "center / cover no-repeat fixed url('/local/vinfast/vf_bg.png')"  # CHANGE: Your background image path
+    background: "center / cover no-repeat fixed url('/local/vinfast/vf_bg.png')"
     layout:
       grid-template-columns: minmax(200px, 260px) 1fr 1fr minmax(160px, 200px)
       grid-template-rows: 1fr auto
@@ -40,7 +46,7 @@ views:
       - type: custom:button-card
         view_layout:
           grid-area: timeweather
-        entity: weather.forecast_home  # CHANGE: Your weather entity
+        entity: weather.forecast_home
         show_name: false
         show_icon: false
         show_state: false
@@ -140,16 +146,20 @@ views:
               `;
             ]]]
 
-      # ===== EV CAR SECTION - ENHANCED =====
-      # CHANGE: Update all sensor.vinfast_* entities to match your VinFast integration
+      # ===== EV CAR SECTION (Center) - ENHANCED =====
       - type: custom:button-card
         view_layout:
           grid-area: car
-        entity: sensor.vinfast_battery  # CHANGE: Your VinFast battery sensor
+        entity: sensor.vinfast_battery
         show_name: false
         show_icon: false
         show_state: false
         tap_action:
+          action: none
+        hold_action:
+          action: navigate
+          navigation_path: /wall-panel/cameras
+        double_tap_action:
           action: navigate
           navigation_path: /wall-panel/cameras
         styles:
@@ -165,7 +175,6 @@ views:
         custom_fields:
           content: |
             [[[
-              // CHANGE: Update these entity IDs to match your VinFast integration
               // Battery and range
               const batt = Math.round(parseFloat(entity.state));
               const range = Math.round(parseFloat(states['sensor.vinfast_range']?.state)) || 0;
@@ -227,6 +236,33 @@ views:
                 return h > 0 ? `${h}h ${m}m` : `${m}m`;
               };
 
+              // Last update time - use entity's last_updated
+              const lastUpdated = new Date(entity.last_updated);
+              const now = new Date();
+              const diffMs = now - lastUpdated;
+              const diffMins = Math.floor(diffMs / 60000);
+              const diffHours = Math.floor(diffMins / 60);
+
+              let lastUpdateText = '';
+              if (diffMins < 1) lastUpdateText = 'just now';
+              else if (diffMins < 60) lastUpdateText = `${diffMins}m ago`;
+              else if (diffHours < 24) lastUpdateText = `${diffHours}h ${diffMins % 60}m ago`;
+              else lastUpdateText = `${Math.floor(diffHours/24)}d ago`;
+
+              // Next update (4 hours from last update, or 5 min if charging)
+              const updateInterval = isCharging ? 5 : 240; // minutes
+              const nextUpdateMs = lastUpdated.getTime() + (updateInterval * 60000);
+              const nextUpdate = new Date(nextUpdateMs);
+              const timeToNext = Math.max(0, Math.floor((nextUpdateMs - now.getTime()) / 60000));
+
+              let nextUpdateText = '';
+              if (timeToNext <= 0) nextUpdateText = 'due now';
+              else if (timeToNext < 60) nextUpdateText = `in ${timeToNext}m`;
+              else nextUpdateText = `in ${Math.floor(timeToNext/60)}h ${timeToNext % 60}m`;
+
+              // Stale data warning (> 5 hours old)
+              const isStale = diffHours >= 5;
+
               return `
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: clamp(6px, 1.5vw, 12px); padding: 0 clamp(6px, 1.5vw, 12px);">
                   <div style="position: relative;">
@@ -286,7 +322,7 @@ views:
                     </div>
                   </div>
 
-                  <!-- Status buttons -->
+                  <!-- Action buttons - now show status -->
                   <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: clamp(6px, 1.2vw, 10px);">
                     <!-- Ignition/Gear status -->
                     <div style="display: flex; flex-direction: column; align-items: center; padding: clamp(8px, 1.5vw, 12px) clamp(3px, 0.6vw, 6px); background: ${isIgnitionOn ? 'rgba(76,175,80,0.2)' : 'rgba(255,255,255,0.05)'}; border: 1px solid ${isIgnitionOn ? 'rgba(76,175,80,0.4)' : 'rgba(255,255,255,0.15)'}; border-radius: clamp(8px, 1.5vw, 12px);">
@@ -320,6 +356,18 @@ views:
                       <span style="font-size: clamp(8px, 1.5vw, 11px); color: ${(doorsOpen || windowsOpen || trunkOpen || hoodOpen) ? '#FFC107' : '#4CAF50'};">${(doorsOpen || windowsOpen || trunkOpen || hoodOpen) ? 'Open' : 'Secure'}</span>
                     </div>
                   </div>
+
+                  <!-- Last Update / Next Poll Info -->
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-top: clamp(8px, 1.5vw, 12px); padding-top: clamp(6px, 1vw, 10px); border-top: 1px solid rgba(255,255,255,0.1); font-size: clamp(9px, 1.6vw, 11px);">
+                    <div style="display: flex; align-items: center; gap: 4px; color: ${isStale ? '#FFC107' : 'rgba(255,255,255,0.5)'};">
+                      <ha-icon icon="${isStale ? 'mdi:alert-circle' : 'mdi:update'}" style="--mdc-icon-size: 12px; color: ${isStale ? '#FFC107' : 'rgba(255,255,255,0.4)'};"></ha-icon>
+                      <span>Updated ${lastUpdateText}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,0.5);">
+                      <ha-icon icon="mdi:clock-outline" style="--mdc-icon-size: 12px; color: rgba(255,255,255,0.4);"></ha-icon>
+                      <span>Next ${nextUpdateText}</span>
+                    </div>
+                  </div>
                 </div>
               `;
             ]]]
@@ -333,12 +381,50 @@ views:
             50% { opacity: 0.7; }
           }
 
-      # ===== EV SAVINGS SECTION =====
-      # CHANGE: Create these sensors or remove this section if not tracking EV savings
+      # ===== REFRESH BUTTON (small, bottom-right of car card) =====
+      - type: custom:button-card
+        view_layout:
+          grid-area: car
+          place-self: end end
+          margin: 0 20px 24px 0
+        entity: sensor.vinfast_battery
+        show_name: true
+        show_icon: true
+        show_state: false
+        name: Now
+        icon: mdi:refresh
+        tap_action:
+          action: call-service
+          service: homeassistant.update_entity
+          service_data:
+            entity_id: sensor.vinfast_battery
+        styles:
+          card:
+            - background: rgba(255,255,255,0.1)
+            - border: 1px solid rgba(255,255,255,0.15)
+            - border-radius: 6px
+            - padding: 4px 8px
+            - box-shadow: none
+            - cursor: pointer
+            - width: auto
+            - height: auto
+          grid:
+            - grid-template-areas: '"i n"'
+            - grid-template-columns: auto auto
+          icon:
+            - color: rgba(255,255,255,0.6)
+            - width: 11px
+            - height: 11px
+          name:
+            - font-size: 10px
+            - color: rgba(255,255,255,0.6)
+            - margin-left: 3px
+
+      # ===== ENERGY SECTION =====
       - type: custom:button-card
         view_layout:
           grid-area: energy
-        entity: sensor.ev_savings_today  # CHANGE: Your EV savings sensor (or remove section)
+        entity: sensor.ev_savings_today
         show_name: false
         show_icon: false
         show_state: false
@@ -358,7 +444,6 @@ views:
         custom_fields:
           content: |
             [[[
-              // CHANGE: Update these entity IDs to your EV savings sensors
               const today = parseFloat(states['sensor.ev_savings_today']?.state) || 0;
               const month = parseFloat(states['sensor.ev_savings_month']?.state) || 0;
               const percent = parseFloat(states['sensor.ev_savings_percent']?.state) || 0;
@@ -393,11 +478,11 @@ views:
             ]]]
 
 
-      # ===== SECURITY SECTION =====
+      # ===== SECURITY SECTION (Center Bottom) =====
       - type: custom:button-card
         view_layout:
           grid-area: security
-        entity: alarm_control_panel.home_alarm  # CHANGE: Your alarm panel entity
+        entity: alarm_control_panel.home_alarm
         show_name: false
         show_icon: false
         show_state: false
@@ -429,8 +514,7 @@ views:
             [[[
               const alarm = entity;
               const alarmState = alarm?.state || 'unknown';
-              // CHANGE: Your garage door sensor
-              const garageDoor = states['binary_sensor.garage_door']?.state || 'off';
+              const garageDoor = states['binary_sensor.garage_door_2']?.state || 'off';
 
               // VinFast security status
               const carLocked = states['binary_sensor.vinfast_locked']?.state === 'off';
@@ -466,7 +550,7 @@ views:
                   </div>
                   <div style="display: flex; flex-direction: column; align-items: center; padding: 8px 4px; background: ${carLocked ? 'rgba(76,175,80,0.15)' : 'rgba(255,193,7,0.15)'}; border-radius: 12px;">
                     <div style="width: 32px; height: 32px; background: ${carLocked ? '#4CAF50' : '#FFC107'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 4px;">
-                      <ha-icon icon="mdi:car-key" style="--mdc-icon-size: 18px; color: white;"></ha-icon>
+                      <ha-icon icon="${carLocked ? 'mdi:car-key' : 'mdi:car-key'}" style="--mdc-icon-size: 18px; color: white;"></ha-icon>
                     </div>
                     <span style="font-size: 9px; color: ${carLocked ? '#4CAF50' : '#FFC107'}; font-weight: 500;">VF8 ${carLocked ? 'Locked' : 'Open'}</span>
                   </div>
@@ -486,11 +570,11 @@ views:
               `;
             ]]]
 
-      # ===== PRESENCE/STATUS =====
+      # ===== PRESENCE/STATUS (Top Right) =====
       - type: custom:button-card
         view_layout:
           grid-area: status
-        entity: device_tracker.person_1  # CHANGE: Your first person device tracker
+        entity: device_tracker.person_1
         show_name: false
         show_icon: false
         show_state: false
@@ -510,7 +594,6 @@ views:
         custom_fields:
           content: |
             [[[
-              // CHANGE: Update these entity IDs to your device trackers
               const person1 = states['device_tracker.person_1']?.state || 'unknown';
               const person2 = states['device_tracker.person_2']?.state || 'unknown';
 
@@ -538,11 +621,11 @@ views:
               `;
             ]]]
 
-      # ===== BATTERY STATUS =====
+      # ===== BATTERY STATUS (Right Column) =====
       - type: custom:button-card
         view_layout:
           grid-area: battery
-        entity: sensor.phone_1_battery_level  # CHANGE: Your first phone battery sensor
+        entity: sensor.phone_1_battery_level
         show_name: false
         show_icon: false
         show_state: false
@@ -565,58 +648,57 @@ views:
               const getColor = (level) => level < 20 ? '#f44336' : (level < 50 ? '#FFC107' : '#4CAF50');
               const getGlow = (level) => level < 20 ? 'text-shadow: 0 0 10px rgba(244,67,54,0.5);' : (level < 50 ? 'text-shadow: 0 0 10px rgba(255,193,7,0.5);' : 'text-shadow: 0 0 10px rgba(76,175,80,0.5);');
 
-              // CHANGE: Update these entity IDs to your phone and camera battery sensors
-              const phone1 = parseInt(states['sensor.phone_1_battery_level']?.state) || 0;
-              const phone2 = parseInt(states['sensor.phone_2_battery_level']?.state) || 0;
-              const cam1 = parseInt(states['sensor.camera_1_battery']?.state) || 0;
-              const cam2 = parseInt(states['sensor.camera_2_battery']?.state) || 0;
-              const cam3 = parseInt(states['sensor.camera_3_battery']?.state) || 0;
-              const cam4 = parseInt(states['sensor.camera_4_battery']?.state) || 0;
+              const person1 = parseInt(states['sensor.phone_1_battery_level']?.state) || 0;
+              const person2 = parseInt(states['sensor.phone_2_battery_level']?.state) || 0;
+              const arlo1 = parseInt(states['sensor.aarlo_battery_level_1']?.state) || 0;
+              const arlo2 = parseInt(states['sensor.aarlo_battery_level_2']?.state) || 0;
+              const arlo3 = parseInt(states['sensor.aarlo_battery_level_3']?.state) || 0;
+              const arlo4 = parseInt(states['sensor.aarlo_battery_level_4']?.state) || 0;
 
               return `
                 <div style="font-size: clamp(14px, 2.5vw, 18px); font-weight: 500; color: white; margin-bottom: clamp(10px, 2vw, 16px); text-shadow: 0 2px 10px rgba(0,0,0,0.5);">Battery Status</div>
                 <div style="display: flex; flex-direction: column; gap: clamp(5px, 1vw, 8px);">
                   <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; align-items: center; gap: clamp(5px, 1vw, 8px);">
-                      <ha-icon icon="mdi:cellphone" style="--mdc-icon-size: clamp(12px, 2vw, 16px); color: ${getColor(phone1)}; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));"></ha-icon>
-                      <span style="font-size: clamp(10px, 1.8vw, 13px); color: rgba(255,255,255,0.7);">Phone 1</span>
+                      <ha-icon icon="mdi:cellphone" style="--mdc-icon-size: clamp(12px, 2vw, 16px); color: ${getColor(person1)}; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));"></ha-icon>
+                      <span style="font-size: clamp(10px, 1.8vw, 13px); color: rgba(255,255,255,0.7);">Person 1</span>
                     </div>
-                    <span style="font-size: clamp(10px, 1.8vw, 13px); color: ${getColor(phone1)}; ${getGlow(phone1)}">${phone1}%</span>
+                    <span style="font-size: clamp(10px, 1.8vw, 13px); color: ${getColor(person1)}; ${getGlow(person1)}">${person1}%</span>
                   </div>
                   <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; align-items: center; gap: clamp(5px, 1vw, 8px);">
-                      <ha-icon icon="mdi:cellphone" style="--mdc-icon-size: clamp(12px, 2vw, 16px); color: ${getColor(phone2)}; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));"></ha-icon>
-                      <span style="font-size: clamp(10px, 1.8vw, 13px); color: rgba(255,255,255,0.7);">Phone 2</span>
+                      <ha-icon icon="mdi:cellphone" style="--mdc-icon-size: clamp(12px, 2vw, 16px); color: ${getColor(person2)}; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));"></ha-icon>
+                      <span style="font-size: clamp(10px, 1.8vw, 13px); color: rgba(255,255,255,0.7);">Person 2</span>
                     </div>
-                    <span style="font-size: clamp(10px, 1.8vw, 13px); color: ${getColor(phone2)}; ${getGlow(phone2)}">${phone2}%</span>
+                    <span style="font-size: clamp(10px, 1.8vw, 13px); color: ${getColor(person2)}; ${getGlow(person2)}">${person2}%</span>
                   </div>
                   <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; align-items: center; gap: clamp(5px, 1vw, 8px);">
-                      <ha-icon icon="mdi:cctv" style="--mdc-icon-size: clamp(12px, 2vw, 16px); color: ${getColor(cam1)}; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));"></ha-icon>
-                      <span style="font-size: clamp(10px, 1.8vw, 13px); color: rgba(255,255,255,0.7);">Camera 1</span>
+                      <ha-icon icon="mdi:cctv" style="--mdc-icon-size: clamp(12px, 2vw, 16px); color: ${getColor(arlo1)}; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));"></ha-icon>
+                      <span style="font-size: clamp(10px, 1.8vw, 13px); color: rgba(255,255,255,0.7);">Front</span>
                     </div>
-                    <span style="font-size: clamp(10px, 1.8vw, 13px); color: ${getColor(cam1)}; ${getGlow(cam1)}">${cam1}%</span>
+                    <span style="font-size: clamp(10px, 1.8vw, 13px); color: ${getColor(arlo1)}; ${getGlow(arlo1)}">${arlo1}%</span>
                   </div>
                   <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; align-items: center; gap: clamp(5px, 1vw, 8px);">
-                      <ha-icon icon="mdi:cctv" style="--mdc-icon-size: clamp(12px, 2vw, 16px); color: ${getColor(cam2)}; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));"></ha-icon>
-                      <span style="font-size: clamp(10px, 1.8vw, 13px); color: rgba(255,255,255,0.7);">Camera 2</span>
+                      <ha-icon icon="mdi:cctv" style="--mdc-icon-size: clamp(12px, 2vw, 16px); color: ${getColor(arlo2)}; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));"></ha-icon>
+                      <span style="font-size: clamp(10px, 1.8vw, 13px); color: rgba(255,255,255,0.7);">Driveway</span>
                     </div>
-                    <span style="font-size: clamp(10px, 1.8vw, 13px); color: ${getColor(cam2)}; ${getGlow(cam2)}">${cam2}%</span>
+                    <span style="font-size: clamp(10px, 1.8vw, 13px); color: ${getColor(arlo2)}; ${getGlow(arlo2)}">${arlo2}%</span>
                   </div>
                   <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; align-items: center; gap: clamp(5px, 1vw, 8px);">
-                      <ha-icon icon="mdi:cctv" style="--mdc-icon-size: clamp(12px, 2vw, 16px); color: ${getColor(cam3)}; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));"></ha-icon>
-                      <span style="font-size: clamp(10px, 1.8vw, 13px); color: rgba(255,255,255,0.7);">Camera 3</span>
+                      <ha-icon icon="mdi:cctv" style="--mdc-icon-size: clamp(12px, 2vw, 16px); color: ${getColor(arlo3)}; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));"></ha-icon>
+                      <span style="font-size: clamp(10px, 1.8vw, 13px); color: rgba(255,255,255,0.7);">Backyard</span>
                     </div>
-                    <span style="font-size: clamp(10px, 1.8vw, 13px); color: ${getColor(cam3)}; ${getGlow(cam3)}">${cam3}%</span>
+                    <span style="font-size: clamp(10px, 1.8vw, 13px); color: ${getColor(arlo3)}; ${getGlow(arlo3)}">${arlo3}%</span>
                   </div>
                   <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; align-items: center; gap: clamp(5px, 1vw, 8px);">
-                      <ha-icon icon="mdi:cctv" style="--mdc-icon-size: clamp(12px, 2vw, 16px); color: ${getColor(cam4)}; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));"></ha-icon>
-                      <span style="font-size: clamp(10px, 1.8vw, 13px); color: rgba(255,255,255,0.7);">Camera 4</span>
+                      <ha-icon icon="mdi:cctv" style="--mdc-icon-size: clamp(12px, 2vw, 16px); color: ${getColor(arlo4)}; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));"></ha-icon>
+                      <span style="font-size: clamp(10px, 1.8vw, 13px); color: rgba(255,255,255,0.7);">Garage</span>
                     </div>
-                    <span style="font-size: clamp(10px, 1.8vw, 13px); color: ${getColor(cam4)}; ${getGlow(cam4)}">${cam4}%</span>
+                    <span style="font-size: clamp(10px, 1.8vw, 13px); color: ${getColor(arlo4)}; ${getGlow(arlo4)}">${arlo4}%</span>
                   </div>
                 </div>
               `;
@@ -628,7 +710,7 @@ views:
           grid-area: map
           align-self: start
         entities:
-          - entity: device_tracker.vinfast_location  # CHANGE: Your VinFast location tracker
+          - entity: device_tracker.vinfast_location
             name: VF8
         dark_mode: true
         default_zoom: 15
@@ -658,7 +740,7 @@ views:
     path: cameras
     icon: mdi:car-multiple
     type: custom:grid-layout
-    background: "center / cover no-repeat fixed url('/local/vinfast/vf_bg.png')"  # CHANGE: Your background image
+    background: "center / cover no-repeat fixed url('/local/vinfast/vf_bg.png')"
     layout:
       grid-template-columns: 1fr 1fr 1fr
       grid-template-rows: auto auto
@@ -691,12 +773,11 @@ views:
           gap: 8px
           padding: 10px
     cards:
-      # CHANGE: Update all camera entity IDs to match your VinFast integration
       # ===== FRONT CAMERA =====
       - type: picture-entity
         view_layout:
           grid-area: front
-        entity: camera.vinfast_front_camera  # CHANGE: Your VinFast front camera
+        entity: camera.vinfast_front_camera
         name: Front
         show_state: false
         show_name: true
@@ -725,7 +806,7 @@ views:
       - type: picture-entity
         view_layout:
           grid-area: left
-        entity: camera.vinfast_left_camera  # CHANGE: Your VinFast left camera
+        entity: camera.vinfast_left_camera
         name: Left Side
         show_state: false
         show_name: true
@@ -754,7 +835,7 @@ views:
       - type: picture-entity
         view_layout:
           grid-area: right
-        entity: camera.vinfast_right_camera  # CHANGE: Your VinFast right camera
+        entity: camera.vinfast_right_camera
         name: Right Side
         show_state: false
         show_name: true
@@ -783,7 +864,7 @@ views:
       - type: picture-entity
         view_layout:
           grid-area: rear
-        entity: camera.vinfast_rear_camera  # CHANGE: Your VinFast rear camera
+        entity: camera.vinfast_rear_camera
         name: Rear
         show_state: false
         show_name: true
@@ -812,7 +893,7 @@ views:
       - type: picture-entity
         view_layout:
           grid-area: driver
-        entity: camera.vinfast_driver_camera  # CHANGE: Your VinFast interior camera
+        entity: camera.vinfast_driver_camera
         name: Interior
         show_state: false
         show_name: true
@@ -841,7 +922,7 @@ views:
       - type: custom:button-card
         view_layout:
           grid-area: info
-        entity: camera.vinfast_front_camera  # CHANGE: Your VinFast front camera
+        entity: camera.vinfast_front_camera
         show_name: false
         show_icon: false
         show_state: false
@@ -867,8 +948,10 @@ views:
             [[[
               const cam = entity;
               const photoTime = cam?.attributes?.photo_time_formatted || cam?.attributes?.photo_time || 'Unknown';
+              const lat = cam?.attributes?.latitude || '--';
+              const lon = cam?.attributes?.longitude || '--';
 
-              // CHANGE: Update these entity IDs
+              // Get VF8 status
               const batt = Math.round(parseFloat(states['sensor.vinfast_battery']?.state)) || '--';
               const range = Math.round(parseFloat(states['sensor.vinfast_range']?.state)) || '--';
               const isLocked = states['binary_sensor.vinfast_locked']?.state === 'off';
