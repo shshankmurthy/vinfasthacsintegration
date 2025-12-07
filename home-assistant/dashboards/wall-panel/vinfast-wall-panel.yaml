@@ -1,14 +1,36 @@
-# VinFast Wall Panel Dashboard v8
-# A glassmorphism-style dashboard for VinFast EV owners
-# Repository: https://github.com/vinfastownersorg-cyber/vinfastowners
+# ========================================
+# VinFast EV Wall Panel Dashboard - v8
+# ========================================
 #
-# SETUP: Run 'python3 setup.py' for interactive configuration, or
-#        search for entity IDs and update to match your Home Assistant setup.
+# REQUIRED INTEGRATIONS:
+# - VinFast integration (custom_components/vinfast/)
+# - Weather integration (built-in HA - Met.no, OpenWeatherMap, etc.)
+# - Mobile App (built-in HA - for presence & phone batteries)
+# - Map (built-in HA - for vehicle location)
 #
-# NEW IN V8:
-# - Charging stats row (power, session kWh, time to full, duration)
-# - Removed non-functional cameras view
+# OPTIONAL INTEGRATIONS (can be removed):
+# - OCPP Charger integration (lines 177-186, 308-327)
+# - Alarm Panel (alarm_control_panel.home_alarm)
+# - Garage Door sensor (binary_sensor.garage_door)
+# - Camera batteries (lines 683-687, 708-736)
 #
+# REQUIRED CUSTOM CARDS (install via HACS):
+# - button-card
+# - layout-card
+# - card-mod
+#
+# ENTITY NAMING:
+# Replace ALL entity IDs with your actual entity names:
+# - sensor.vinfast_* → your VinFast sensor names
+# - person.person_1/person_2 → your person/device_tracker entities
+# - sensor.phone_1_battery_level → your phone battery sensors
+# - sensor.camera_*_battery_level → your camera battery sensors (optional)
+# - alarm_control_panel.home_alarm → your alarm panel (optional)
+# - binary_sensor.garage_door → your garage door sensor (optional)
+#
+# See README.md for full setup instructions
+# ========================================
+
 title: Wall Panel
 views:
   - title: Home
@@ -155,6 +177,12 @@ views:
         show_state: false
         tap_action:
           action: none
+        hold_action:
+          action: navigate
+          navigation_path: /wall-panel/cameras
+        double_tap_action:
+          action: navigate
+          navigation_path: /wall-panel/cameras
         styles:
           card:
             - background: transparent
@@ -179,7 +207,9 @@ views:
               const timeToFull = parseFloat(states['sensor.vinfast_time_to_full']?.state) || 0;
               const chargingPower = states['sensor.vinfast_charging_power']?.state;
 
-              // OCPP charger data for charging stats row
+              // OCPP charger data for charging stats row (OPTIONAL - requires OCPP integration)
+              // If you don't have OCPP, this row will gracefully hide when not charging
+              // Remove lines 177-184 and 307-326 if you want to completely remove OCPP features
               const ocppPower = parseFloat(states['sensor.charger_power_active_import']?.state) || 0;
               const ocppPowerText = ocppPower > 1000 ? (ocppPower/1000).toFixed(1) + ' kW' : ocppPower.toFixed(0) + ' W';
               const ocppSessionKwh = (parseFloat(states['sensor.charger_energy_session']?.state) || 0).toFixed(1);
@@ -189,23 +219,24 @@ views:
               const ocppDurationText = ocppDurationH > 0 ? ocppDurationH + 'h ' + ocppDurationM + 'm' : ocppDurationM + 'm';
 
               // Temperatures
-              const insideTemp = Math.round(parseFloat(states['sensor.vinfast_inside_temperature']?.state)) || '--';
-              const outsideTemp = Math.round(parseFloat(states['sensor.vinfast_outside_temperature']?.state)) || '--';
+              const insideTemp = Math.round(parseFloat(states['sensor.vinfast_temperature_2']?.state)) || '--';
+              const outsideTemp = Math.round(parseFloat(states['sensor.vinfast_temperature']?.state)) || '--';
 
               // Vehicle status
               const isLocked = states['binary_sensor.vinfast_locked']?.state === 'off'; // off means locked
               const isPluggedIn = states['binary_sensor.vinfast_plug']?.state === 'on';
               const isIgnitionOn = states['binary_sensor.vinfast_power']?.state === 'on';
-              const gear = states['sensor.vinfast_gear']?.state || 'P';
+              const gear = states['sensor.vinfast_none']?.state || 'P';
               const odometer = Math.round(parseFloat(states['sensor.vinfast_odometer']?.state)) || 0;
+
               // 12V battery - entity may be named _voltage or _battery_12v depending on HA version
-              const battery12v = Math.round(parseFloat(states['sensor.vinfast_battery_12v']?.state || states['sensor.vinfast_voltage']?.state)) || 0;
+              const battery12v = Math.round(parseFloat(states['sensor.vinfast_voltage']?.state || states['sensor.vinfast_battery_12v']?.state)) || 0;
 
               // Door/window status
               const doorsOpen = states['binary_sensor.vinfast_door']?.state === 'on';
               const windowsOpen = states['binary_sensor.vinfast_window']?.state === 'on';
-              const trunkOpen = states['binary_sensor.vinfast_trunk']?.state === 'on';
-              const hoodOpen = states['binary_sensor.vinfast_hood']?.state === 'on';
+              const trunkOpen = states['binary_sensor.vinfast_opening']?.state === 'on';
+              const hoodOpen = states['binary_sensor.vinfast_opening_2']?.state === 'on';
 
               // Location
               const location = states['device_tracker.vinfast_location']?.state || 'unknown';
@@ -220,10 +251,10 @@ views:
               const battColor = getBattColor(batt);
 
               // Tire pressures (FL, FR, RL, RR)
-              const fl = parseFloat(states['sensor.vinfast_tire_pressure_fl']?.state) || 0;
-              const fr = parseFloat(states['sensor.vinfast_tire_pressure_fr']?.state) || 0;
-              const rl = parseFloat(states['sensor.vinfast_tire_pressure_rl']?.state) || 0;
-              const rr = parseFloat(states['sensor.vinfast_tire_pressure_rr']?.state) || 0;
+              const fl = parseFloat(states['sensor.vinfast_pressure']?.state) || 0;
+              const fr = parseFloat(states['sensor.vinfast_pressure_2']?.state) || 0;
+              const rl = parseFloat(states['sensor.vinfast_pressure_3']?.state) || 0;
+              const rr = parseFloat(states['sensor.vinfast_pressure_4']?.state) || 0;
 
               // Pressure color (normal 35-42 PSI for VF8)
               const getPressureColor = (psi) => {
@@ -307,33 +338,30 @@ views:
                     <div style="position: absolute; left: ${chargeLimit}%; top: -18px; transform: translateX(-50%); font-size: 9px; color: rgba(255,255,255,0.5);">${chargeLimit}%</div>
                   </div>
 
-                  <!-- Charging stats row (only when charging) - above ODO -->
+                  <!-- Charging stats row (OPTIONAL - only when charging, requires OCPP integration) -->
+                  <!-- If you don't have OCPP, remove this entire block (lines 306-326) -->
                   ${isCharging ? `
-                  <div style="display: flex; justify-content: space-around; align-items: center; padding: clamp(4px, 1vw, 8px) 0; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 4px; font-size: clamp(10px, 1.8vw, 13px); color: rgba(255,255,255,0.7); background: rgba(76,175,80,0.1); border-radius: 8px;">
+                  <div style="display: flex; justify-content: space-around; align-items: center; padding: clamp(6px, 1.2vw, 10px) clamp(8px, 1.5vw, 12px); border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: clamp(6px, 1.2vw, 10px); font-size: clamp(9px, 1.6vw, 12px); color: rgba(255,255,255,0.7); background: rgba(76,175,80,0.08); border-radius: 8px;">
                     <div style="display: flex; align-items: center; gap: 4px;">
-                      <ha-icon icon="mdi:lightning-bolt" style="--mdc-icon-size: clamp(12px, 2vw, 16px); color: #4CAF50;"></ha-icon>
-                      <span style="color: rgba(255,255,255,0.5);">Power</span>
-                      <span style="color: #4CAF50;">${ocppPowerText}</span>
+                      <ha-icon icon="mdi:lightning-bolt" style="--mdc-icon-size: clamp(11px, 2vw, 14px); color: #4CAF50;"></ha-icon>
+                      <span style="color: #4CAF50; font-weight: 500;">${ocppPowerText}</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 4px;">
-                      <ha-icon icon="mdi:battery-charging" style="--mdc-icon-size: clamp(12px, 2vw, 16px); color: #4CAF50;"></ha-icon>
-                      <span style="color: rgba(255,255,255,0.5);">Session</span>
-                      <span style="color: #4CAF50;">${ocppSessionKwh} kWh</span>
+                      <ha-icon icon="mdi:battery-charging" style="--mdc-icon-size: clamp(11px, 2vw, 14px); color: #4CAF50;"></ha-icon>
+                      <span style="color: #4CAF50; font-weight: 500;">${ocppSessionKwh} kWh</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 4px;">
-                      <ha-icon icon="mdi:battery-clock" style="--mdc-icon-size: clamp(12px, 2vw, 16px); color: #64B5F6;"></ha-icon>
-                      <span style="color: rgba(255,255,255,0.5);">Full in</span>
+                      <ha-icon icon="mdi:battery-clock" style="--mdc-icon-size: clamp(11px, 2vw, 14px); color: #64B5F6;"></ha-icon>
                       <span style="color: #64B5F6;">${timeToFull > 0 ? formatChargingTime(timeToFull) : '--'}</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 4px;">
-                      <ha-icon icon="mdi:timer-outline" style="--mdc-icon-size: clamp(12px, 2vw, 16px); color: rgba(255,255,255,0.5);"></ha-icon>
-                      <span style="color: rgba(255,255,255,0.5);">Duration</span>
+                      <ha-icon icon="mdi:timer-outline" style="--mdc-icon-size: clamp(11px, 2vw, 14px); color: rgba(255,255,255,0.5);"></ha-icon>
                       <span>${ocppDurationText}</span>
                     </div>
                   </div>
                   ` : ''}
 
-                  <!-- Status row (ODO, 12V, charging status) -->
+                  <!-- Status row -->
                   <div style="display: flex; justify-content: space-between; align-items: center; padding: clamp(4px, 1vw, 8px) 0; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: clamp(8px, 1.5vw, 12px); font-size: clamp(10px, 1.8vw, 13px); color: rgba(255,255,255,0.7);">
                     <div style="display: flex; align-items: center; gap: clamp(4px, 1vw, 8px);">
                       <ha-icon icon="${location === 'home' ? 'mdi:home' : 'mdi:map-marker'}" style="--mdc-icon-size: clamp(12px, 2vw, 16px); color: ${location === 'home' ? '#4CAF50' : '#64B5F6'};"></ha-icon>
@@ -349,7 +377,7 @@ views:
                     <div style="display: flex; align-items: center; gap: clamp(4px, 1vw, 8px);">
                       ${isPluggedIn ? '<ha-icon icon="mdi:ev-plug-type1" style="--mdc-icon-size: clamp(12px, 2vw, 16px); color: #4CAF50;"></ha-icon>' : ''}
                       ${isCharging
-                        ? `<span style="color: #4CAF50;">${chargingPower && chargingPower !== 'unavailable' ? chargingPower + ' kW' : 'Charging'}${timeToFull > 0 ? ' - ' + formatChargingTime(timeToFull) : ''}</span>`
+                        ? `<span style="color: #4CAF50;">Charging</span>`
                         : `<span>${chargingStatus}</span>`
                       }
                     </div>
@@ -393,7 +421,7 @@ views:
                   <!-- Last Update / Next Poll Info -->
                   <div style="display: flex; justify-content: space-between; align-items: center; margin-top: clamp(8px, 1.5vw, 12px); padding-top: clamp(6px, 1vw, 10px); border-top: 1px solid rgba(255,255,255,0.1); font-size: clamp(9px, 1.6vw, 11px);">
                     <div style="display: flex; align-items: center; gap: 4px; color: ${isStale ? '#FFC107' : 'rgba(255,255,255,0.5)'};">
-                      <ha-icon icon="${isStale ? 'mdi:alert-circle' : 'mdi:update'}" style="--mdc-icon-size: 12px; color: ${isStale ? '#FFC107' : 'rgba(255,255,255,0.4)'};"></ha-icon>
+                      <ha-icon icon="${isStale ? 'mdi:alert-circle' : 'mdi:update'}" style="--mdc-icon-size: 12px; color: ${isStale ? '#FFC107' : 'rgba(255,255,255,0.4)'};}"></ha-icon>
                       <span>Updated ${lastUpdateText}</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,0.5);">
@@ -457,7 +485,7 @@ views:
       - type: custom:button-card
         view_layout:
           grid-area: energy
-        entity: sensor.ev_savings_today
+        entity: sensor.gas_savings_today
         show_name: false
         show_icon: false
         show_state: false
@@ -477,9 +505,9 @@ views:
         custom_fields:
           content: |
             [[[
-              const today = parseFloat(states['sensor.ev_savings_today']?.state) || 0;
-              const month = parseFloat(states['sensor.ev_savings_month']?.state) || 0;
-              const percent = parseFloat(states['sensor.ev_savings_percent']?.state) || 0;
+              const today = parseFloat(states['sensor.gas_savings_today']?.state) || 0;
+              const month = parseFloat(states['sensor.gas_savings_31_days']?.state) || 0;
+              const percent = parseFloat(states['sensor.gas_savings_percent']?.state) || 0;
 
               const formatMoney = (val) => {
                 const isNeg = val < 0;
@@ -547,7 +575,7 @@ views:
             [[[
               const alarm = entity;
               const alarmState = alarm?.state || 'unknown';
-              const garageDoor = states['binary_sensor.garage_door_2']?.state || 'off';
+              const garageDoor = states['binary_sensor.garage_door']?.state || 'off';
 
               // VinFast security status
               const carLocked = states['binary_sensor.vinfast_locked']?.state === 'off';
@@ -607,7 +635,7 @@ views:
       - type: custom:button-card
         view_layout:
           grid-area: status
-        entity: device_tracker.person_1
+        entity: person.person_1
         show_name: false
         show_icon: false
         show_state: false
@@ -627,8 +655,8 @@ views:
         custom_fields:
           content: |
             [[[
-              const person1 = states['device_tracker.person_1']?.state || 'unknown';
-              const person2 = states['device_tracker.person_2']?.state || 'unknown';
+              const person1Status = states['person.person_1']?.state || 'unknown';
+              const person2Status = states['person.person_2']?.state || 'unknown';
 
               const getStatusColor = (state) => state === 'home' ? '#4CAF50' : 'rgba(255,255,255,0.4)';
               const getStatusText = (state) => state === 'home' ? 'Home' : 'Away';
@@ -638,17 +666,17 @@ views:
                 <div style="display: flex; flex-direction: column; gap: clamp(8px, 1.5vw, 12px);">
                   <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; align-items: center; gap: clamp(6px, 1.2vw, 10px);">
-                      <ha-icon icon="mdi:account" style="--mdc-icon-size: clamp(18px, 3vw, 22px); color: ${getStatusColor(person1)}; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.4));"></ha-icon>
+                      <ha-icon icon="mdi:account" style="--mdc-icon-size: clamp(18px, 3vw, 22px); color: ${getStatusColor(person1Status)}; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.4));"></ha-icon>
                       <span style="font-size: clamp(11px, 2vw, 14px); color: rgba(255,255,255,0.8);">Person 1</span>
                     </div>
-                    <span style="font-size: clamp(10px, 1.8vw, 13px); color: ${getStatusColor(person1)}; ${person1 === 'home' ? 'text-shadow: 0 0 10px rgba(76,175,80,0.5);' : ''}">${getStatusText(person1)}</span>
+                    <span style="font-size: clamp(10px, 1.8vw, 13px); color: ${getStatusColor(person1Status)}; ${person1Status === 'home' ? 'text-shadow: 0 0 10px rgba(76,175,80,0.5);' : ''}">${getStatusText(person1Status)}</span>
                   </div>
                   <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; align-items: center; gap: clamp(6px, 1.2vw, 10px);">
-                      <ha-icon icon="mdi:account" style="--mdc-icon-size: clamp(18px, 3vw, 22px); color: ${getStatusColor(person2)}; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.4));"></ha-icon>
+                      <ha-icon icon="mdi:account" style="--mdc-icon-size: clamp(18px, 3vw, 22px); color: ${getStatusColor(person2Status)}; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.4));"></ha-icon>
                       <span style="font-size: clamp(11px, 2vw, 14px); color: rgba(255,255,255,0.8);">Person 2</span>
                     </div>
-                    <span style="font-size: clamp(10px, 1.8vw, 13px); color: ${getStatusColor(person2)}; ${person2 === 'home' ? 'text-shadow: 0 0 10px rgba(76,175,80,0.5);' : ''}">${getStatusText(person2)}</span>
+                    <span style="font-size: clamp(10px, 1.8vw, 13px); color: ${getStatusColor(person2Status)}; ${person2Status === 'home' ? 'text-shadow: 0 0 10px rgba(76,175,80,0.5);' : ''}">${getStatusText(person2Status)}</span>
                   </div>
                 </div>
               `;
@@ -681,16 +709,20 @@ views:
               const getColor = (level) => level < 20 ? '#f44336' : (level < 50 ? '#FFC107' : '#4CAF50');
               const getGlow = (level) => level < 20 ? 'text-shadow: 0 0 10px rgba(244,67,54,0.5);' : (level < 50 ? 'text-shadow: 0 0 10px rgba(255,193,7,0.5);' : 'text-shadow: 0 0 10px rgba(76,175,80,0.5);');
 
+              // Phone batteries (REQUIRED - from Mobile App integration)
               const person1 = parseInt(states['sensor.phone_1_battery_level']?.state) || 0;
               const person2 = parseInt(states['sensor.phone_2_battery_level']?.state) || 0;
-              const arlo1 = parseInt(states['sensor.aarlo_battery_level_1']?.state) || 0;
-              const arlo2 = parseInt(states['sensor.aarlo_battery_level_2']?.state) || 0;
-              const arlo3 = parseInt(states['sensor.aarlo_battery_level_3']?.state) || 0;
-              const arlo4 = parseInt(states['sensor.aarlo_battery_level_4']?.state) || 0;
+
+              // Camera batteries (OPTIONAL - remove lines 683-686 and corresponding HTML if you don't have cameras)
+              const camera1 = parseInt(states['sensor.camera_1_battery_level']?.state) || 0;
+              const camera2 = parseInt(states['sensor.camera_2_battery_level']?.state) || 0;
+              const camera3 = parseInt(states['sensor.camera_3_battery_level']?.state) || 0;
+              const camera4 = parseInt(states['sensor.camera_4_battery_level']?.state) || 0;
 
               return `
                 <div style="font-size: clamp(14px, 2.5vw, 18px); font-weight: 500; color: white; margin-bottom: clamp(10px, 2vw, 16px); text-shadow: 0 2px 10px rgba(0,0,0,0.5);">Battery Status</div>
                 <div style="display: flex; flex-direction: column; gap: clamp(5px, 1vw, 8px);">
+                  <!-- Phone Batteries (REQUIRED) -->
                   <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; align-items: center; gap: clamp(5px, 1vw, 8px);">
                       <ha-icon icon="mdi:cellphone" style="--mdc-icon-size: clamp(12px, 2vw, 16px); color: ${getColor(person1)}; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));"></ha-icon>
@@ -705,33 +737,35 @@ views:
                     </div>
                     <span style="font-size: clamp(10px, 1.8vw, 13px); color: ${getColor(person2)}; ${getGlow(person2)}">${person2}%</span>
                   </div>
+
+                  <!-- Camera Batteries (OPTIONAL - remove these 4 sections if you don't have cameras) -->
                   <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; align-items: center; gap: clamp(5px, 1vw, 8px);">
-                      <ha-icon icon="mdi:cctv" style="--mdc-icon-size: clamp(12px, 2vw, 16px); color: ${getColor(arlo1)}; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));"></ha-icon>
-                      <span style="font-size: clamp(10px, 1.8vw, 13px); color: rgba(255,255,255,0.7);">Front</span>
+                      <ha-icon icon="mdi:cctv" style="--mdc-icon-size: clamp(12px, 2vw, 16px); color: ${getColor(camera1)}; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));"></ha-icon>
+                      <span style="font-size: clamp(10px, 1.8vw, 13px); color: rgba(255,255,255,0.7);">Camera 1</span>
                     </div>
-                    <span style="font-size: clamp(10px, 1.8vw, 13px); color: ${getColor(arlo1)}; ${getGlow(arlo1)}">${arlo1}%</span>
+                    <span style="font-size: clamp(10px, 1.8vw, 13px); color: ${getColor(camera1)}; ${getGlow(camera1)}">${camera1}%</span>
                   </div>
                   <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; align-items: center; gap: clamp(5px, 1vw, 8px);">
-                      <ha-icon icon="mdi:cctv" style="--mdc-icon-size: clamp(12px, 2vw, 16px); color: ${getColor(arlo2)}; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));"></ha-icon>
-                      <span style="font-size: clamp(10px, 1.8vw, 13px); color: rgba(255,255,255,0.7);">Driveway</span>
+                      <ha-icon icon="mdi:cctv" style="--mdc-icon-size: clamp(12px, 2vw, 16px); color: ${getColor(camera2)}; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));"></ha-icon>
+                      <span style="font-size: clamp(10px, 1.8vw, 13px); color: rgba(255,255,255,0.7);">Camera 2</span>
                     </div>
-                    <span style="font-size: clamp(10px, 1.8vw, 13px); color: ${getColor(arlo2)}; ${getGlow(arlo2)}">${arlo2}%</span>
+                    <span style="font-size: clamp(10px, 1.8vw, 13px); color: ${getColor(camera2)}; ${getGlow(camera2)}">${camera2}%</span>
                   </div>
                   <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; align-items: center; gap: clamp(5px, 1vw, 8px);">
-                      <ha-icon icon="mdi:cctv" style="--mdc-icon-size: clamp(12px, 2vw, 16px); color: ${getColor(arlo3)}; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));"></ha-icon>
-                      <span style="font-size: clamp(10px, 1.8vw, 13px); color: rgba(255,255,255,0.7);">Backyard</span>
+                      <ha-icon icon="mdi:cctv" style="--mdc-icon-size: clamp(12px, 2vw, 16px); color: ${getColor(camera3)}; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));"></ha-icon>
+                      <span style="font-size: clamp(10px, 1.8vw, 13px); color: rgba(255,255,255,0.7);">Camera 3</span>
                     </div>
-                    <span style="font-size: clamp(10px, 1.8vw, 13px); color: ${getColor(arlo3)}; ${getGlow(arlo3)}">${arlo3}%</span>
+                    <span style="font-size: clamp(10px, 1.8vw, 13px); color: ${getColor(camera3)}; ${getGlow(camera3)}">${camera3}%</span>
                   </div>
                   <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; align-items: center; gap: clamp(5px, 1vw, 8px);">
-                      <ha-icon icon="mdi:cctv" style="--mdc-icon-size: clamp(12px, 2vw, 16px); color: ${getColor(arlo4)}; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));"></ha-icon>
-                      <span style="font-size: clamp(10px, 1.8vw, 13px); color: rgba(255,255,255,0.7);">Garage</span>
+                      <ha-icon icon="mdi:cctv" style="--mdc-icon-size: clamp(12px, 2vw, 16px); color: ${getColor(camera4)}; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));"></ha-icon>
+                      <span style="font-size: clamp(10px, 1.8vw, 13px); color: rgba(255,255,255,0.7);">Camera 4</span>
                     </div>
-                    <span style="font-size: clamp(10px, 1.8vw, 13px); color: ${getColor(arlo4)}; ${getGlow(arlo4)}">${arlo4}%</span>
+                    <span style="font-size: clamp(10px, 1.8vw, 13px); color: ${getColor(camera4)}; ${getGlow(camera4)}">${camera4}%</span>
                   </div>
                 </div>
               `;

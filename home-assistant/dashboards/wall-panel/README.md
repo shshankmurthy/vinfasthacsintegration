@@ -6,12 +6,16 @@ A beautiful glassmorphism-style wall panel dashboard designed specifically for V
 
 ## Features
 
-### v7 Enhancements (Latest)
-- **Multi-Vehicle Support** - Display 1-4 VinFast vehicles on one dashboard
-- **Unified Map View** - All vehicles shown on a single map
+### v8 Enhancements (Latest - December 2025)
+- **12V Battery Display** - Shows 12V battery level next to odometer
+- **OCPP Charging Stats** *(Optional)* - Live charging power, session energy, time to full, and duration
 - **Telemetry Status Display** - Shows "Updated Xm ago" and "Next in Xh Xm"
 - **Stale Data Warning** - Yellow alert when data is over 5 hours old
 - **Manual Refresh Button** - Tap to trigger immediate telemetry update
+- **Privacy-Safe Configuration** - Generic entity names for public sharing
+- **Optional Integrations Clearly Marked** - OCPP and camera batteries can be easily removed
+
+### v7 Features
 - **Combined Time & Weather Card** - Clock and weather unified in a sleek header
 - **Live Vehicle Status** - Real-time indicators for gear, lock, plug, and doors
 - **Temperature Display** - Both inside and outside temperatures
@@ -59,11 +63,14 @@ These frontend cards must be installed via HACS before the dashboard will work:
 
 ### Optional Integrations
 
-| Integration | Source | Purpose |
-|-------------|--------|---------|
-| Alarm Panel | HA Store or custom | Security status display |
-| Garage Door | HA Store or custom | Garage door status |
-| Camera batteries | Arlo, Ring, etc. | Camera battery monitoring |
+These can be safely removed from the dashboard if you don't have them:
+
+| Integration | Source | Purpose | How to Remove |
+|-------------|--------|---------|---------------|
+| **OCPP Charger** | HA OCPP Integration | Live charging stats (power, kWh, duration) | Remove lines 177-186 and 308-327 from YAML |
+| Alarm Panel | HA Store or custom | Security status display | Remove alarm panel card section |
+| Garage Door | HA Store or custom | Garage door status | Remove garage door elements from security card |
+| Camera batteries | Arlo, Ring, etc. | Camera battery monitoring | Remove lines 683-687 and 708-736 from YAML |
 
 ## Installation
 
