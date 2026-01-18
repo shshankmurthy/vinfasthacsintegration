@@ -1,3 +1,5 @@
+This repository is a fork of [https://github.com/vinfastownersorg-cyber/vinfastowners](https://github.com/vinfastownersorg-cyber/vinfastowners) and has been made compatible with HACS (Home Assistant Community Store) for easier installation and management. You can add this repository to HACS as a custom repository.
+
 # VinFast Owners Community Resources
 
 Open source tools, integrations, and resources for VinFast EV owners.
