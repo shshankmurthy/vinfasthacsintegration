@@ -6,7 +6,7 @@ Open source tools, integrations, and resources for VinFast EV owners.
 
 ## Projects
 
-### [VinFast Wall Panel Dashboard](home-assistant/dashboards/wall-panel/)
+### [VinFast Wall Panel Dashboard](example_config/dashboards/wall-panel/)
 Beautiful glassmorphism-style dashboard for Nest Hub and tablet displays:
 - Real-time battery, range, and charging status
 - Live vehicle status (lock, plug, doors, gear)
@@ -15,9 +15,9 @@ Beautiful glassmorphism-style dashboard for Nest Hub and tablet displays:
 - Telemetry update status with manual refresh
 - Optimized for Google Nest Hub 7"/10" displays
 
-**[View Wall Panel Setup Guide](home-assistant/dashboards/wall-panel/README.md)**
+**[View Wall Panel Setup Guide](example_config/dashboards/wall-panel/README.md)**
 
-### [VinFast Home Assistant Integration](home-assistant/)
+### [VinFast Home Assistant Integration](custom_components/vinfast/)
 Custom integration for VinFast Connected Car:
 - Vehicle telemetry (battery, range, odometer, tire pressure)
 - Location tracking with GPS
@@ -26,7 +26,7 @@ Custom integration for VinFast Connected Car:
 - Temperature (inside/outside)
 - Region support (US, Europe, Vietnam)
 
-### [OCPP Charger Integration](home-assistant/ocpp-setup/)
+### [OCPP Charger Integration](example_config/ocpp-setup/)
 For VinFast owners with OCPP-compatible chargers:
 - Real-time charger monitoring dashboard
 - Charging cost tracking (session, daily, weekly, monthly)
@@ -34,7 +34,7 @@ For VinFast owners with OCPP-compatible chargers:
 - Auto-start charging automation
 - Voice announcements for charging events
 
-[View Home Assistant Setup Guide](home-assistant/README.md)
+[View Home Assistant Setup Guide](example_config/README.md)
 
 ## Contributing
 
